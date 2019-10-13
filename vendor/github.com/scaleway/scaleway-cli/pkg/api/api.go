@@ -17,7 +17,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"sort"
@@ -923,8 +922,23 @@ type MarketImages struct {
 	Images []MarketImage `json:"images"`
 }
 
+var timeout = time.Duration(10 * time.Second)
+
+func dialTimeout(network, addr string) (net.Conn, error) {
+	return net.DialTimeout(network, addr, timeout)
+}
+
 // NewScalewayAPI creates a ready-to-use ScalewayAPI client
 func NewScalewayAPI(organization, token, userAgent, region string, options ...func(*ScalewayAPI)) (*ScalewayAPI, error) {
+	transport := http.Transport{
+		Dial: dialTimeout,
+	}
+
+	client := http.Client{
+		Timeout:   timeout,
+		Transport: &transport,
+	}
+
 	s := &ScalewayAPI{
 		// exposed
 		Organization: organization,
@@ -932,7 +946,7 @@ func NewScalewayAPI(organization, token, userAgent, region string, options ...fu
 		Logger:       NewDefaultLogger(),
 
 		// internal
-		client:    &http.Client{},
+		client:    &client,
 		verbose:   os.Getenv("SCW_VERBOSE_API") != "",
 		password:  "",
 		userAgent: userAgent,
@@ -948,6 +962,7 @@ func NewScalewayAPI(organization, token, userAgent, region string, options ...fu
 	if os.Getenv("SCW_TLSVERIFY") == "0" {
 		s.client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			Dial:            dialTimeout,
 		}
 	}
 	switch region {
@@ -988,13 +1003,13 @@ func (s *ScalewayAPI) response(method, uri string, content io.Reader) (resp *htt
 	req.Header.Set("X-Auth-Token", s.Token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", s.userAgent)
-	s.LogHTTP(req)
-	if s.verbose {
-		dump, _ := httputil.DumpRequest(req, true)
-		s.Debugf("%v", string(dump))
-	} else {
-		s.Debugf("[%s]: %v", method, uri)
-	}
+	// s.LogHTTP(req)
+	// if s.verbose {
+	// 	dump, _ := httputil.DumpRequest(req, true)
+	// 	s.Debugf("%v", string(dump))
+	// } else {
+	// 	s.Debugf("[%s]: %v", method, uri)
+	// }
 	resp, err = s.client.Do(req)
 	return
 }
@@ -1125,32 +1140,34 @@ func (s *ScalewayAPI) handleHTTPError(goodStatusCode []int, resp *http.Response)
 	if err != nil {
 		return nil, err
 	}
-	if s.verbose {
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-		dump, err := httputil.DumpResponse(resp, true)
-		if err == nil {
-			var js bytes.Buffer
+	// if s.verbose {
+	// 	resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	// 	dump, err := httputil.DumpResponse(resp, true)
+	// 	if err == nil {
+	// 		var js bytes.Buffer
 
-			err = json.Indent(&js, body, "", "  ")
-			if err != nil {
-				s.Debugf("[Response]: [%v]\n%v", resp.StatusCode, string(dump))
-			} else {
-				s.Debugf("[Response]: [%v]\n%v", resp.StatusCode, js.String())
-			}
-		}
-	} else {
-		s.Debugf("[Response]: [%v]\n%v", resp.StatusCode, string(body))
-	}
+	// 		err = json.Indent(&js, body, "", "  ")
+	// 		if err != nil {
+	// 			s.Debugf("[Response]: [%v]\n%v", resp.StatusCode, string(dump))
+	// 		} else {
+	// 			s.Debugf("[Response]: [%v]\n%v", resp.StatusCode, js.String())
+	// 		}
+	// 	}
+	// } else {
+	// 	s.Debugf("[Response]: [%v]\n%v", resp.StatusCode, string(body))
+	// }
 
 	if resp.StatusCode >= http.StatusInternalServerError {
 		return nil, errors.New(string(body))
 	}
+
 	good := false
 	for _, code := range goodStatusCode {
 		if code == resp.StatusCode {
 			good = true
 		}
 	}
+
 	if !good {
 		var scwError ScalewayAPIError
 
@@ -1161,6 +1178,7 @@ func (s *ScalewayAPI) handleHTTPError(goodStatusCode []int, resp *http.Response)
 		s.Debugf("%s", scwError.Error())
 		return nil, scwError
 	}
+
 	return body, nil
 }
 

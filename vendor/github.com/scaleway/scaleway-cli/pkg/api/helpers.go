@@ -395,23 +395,23 @@ func CreateServer(api *ScalewayAPI, c *ConfigCreateServer) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Unknow commercial type %v: %v", server.CommercialType, err)
 	}
-	if offer.VolumesConstraint.MinSize > 0 && c.AdditionalVolumes == "" {
-		c.AdditionalVolumes = VolumesFromSize(offer.VolumesConstraint.MinSize)
-		log.Debugf("%s needs at least %s. Automatically creates the following volumes: %s",
-			server.CommercialType, humanize.Bytes(offer.VolumesConstraint.MinSize), c.AdditionalVolumes)
-	}
-	if c.AdditionalVolumes != "" {
-		volumes := strings.Split(c.AdditionalVolumes, " ")
-		for i := range volumes {
-			volumeID, err := CreateVolumeFromHumanSize(api, volumes[i])
-			if err != nil {
-				return "", err
-			}
+	// if offer.VolumesConstraint.MinSize > 0 && c.AdditionalVolumes == "" {
+	// 	c.AdditionalVolumes = VolumesFromSize(offer.VolumesConstraint.MinSize)
+	// 	log.Debugf("%s needs at least %s. Automatically creates the following volumes: %s",
+	// 		server.CommercialType, humanize.Bytes(offer.VolumesConstraint.MinSize), c.AdditionalVolumes)
+	// }
+	// if c.AdditionalVolumes != "" {
+	// 	volumes := strings.Split(c.AdditionalVolumes, " ")
+	// 	for i := range volumes {
+	// 		volumeID, err := CreateVolumeFromHumanSize(api, volumes[i])
+	// 		if err != nil {
+	// 			return "", err
+	// 		}
 
-			volumeIDx := fmt.Sprintf("%d", i+1)
-			server.Volumes[volumeIDx] = *volumeID
-		}
-	}
+	// 		volumeIDx := fmt.Sprintf("%d", i+1)
+	// 		server.Volumes[volumeIDx] = *volumeID
+	// 	}
+	// }
 
 	arch := os.Getenv("SCW_TARGET_ARCH")
 	if arch == "" {

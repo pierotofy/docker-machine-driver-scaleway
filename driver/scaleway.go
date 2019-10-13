@@ -307,10 +307,6 @@ func (d *Driver) GetState() (st state.State, err error) {
 	case "starting":
 		st = state.Starting
 	case "running":
-		if d.created {
-			time.Sleep(60 * time.Second)
-			d.created = false
-		}
 		st = state.Running
 	case "stopping":
 		st = state.Stopping
